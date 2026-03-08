@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Run tests
+        run: cargo test --verbose
+      - name: Build WASM
+        run: cargo build --target wasm32-unknown-unknown --release
+      - name: Check binary size
+        run: |
+          ls -lh target/wasm32-unknown-unknown/release/*.wasm

@@ -1,0 +1,7 @@
+name = "scheduler"
+version = "1.0.0"
+description = "Scheduling, cron jobs, and reminders for Fawx agents"
+author = "Fawx Team"
+api_version = "host_api_v1"
+capabilities = ["storage"]
+entry_point = "run"

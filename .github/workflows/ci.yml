@@ -1,13 +1,9 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
-env:
-  CARGO_TERM_COLOR: always
 
 jobs:
   test:
@@ -17,10 +13,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-      - name: Run tests
-        run: cargo test --verbose
+          components: clippy, rustfmt
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+      - name: Test
+        run: cargo test
       - name: Build WASM
-        run: cargo build --target wasm32-unknown-unknown --release
-      - name: Check binary size
-        run: |
-          ls -lh target/wasm32-unknown-unknown/release/*.wasm
+        run: cargo build --release --target wasm32-unknown-unknown

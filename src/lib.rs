@@ -1,4 +1,3 @@
-#![cfg_attr(test, allow(dead_code))]
 //! Scheduler skill — cron-based scheduling, reminders, and periodic jobs for Fawx agents.
 //!
 //! Actions: add, remove, list, check (for due jobs).
@@ -99,6 +98,7 @@ extern "C" {
 #[cfg(not(test))]
 const MAX_HOST_STRING_LEN: usize = 65536;
 
+#[cfg(not(test))]
 const KV_KEY: &str = "scheduler:jobs";
 
 /// Read a null-terminated string from WASM linear memory.
@@ -112,7 +112,10 @@ unsafe fn read_host_string(ptr: u32) -> String {
         return String::new();
     }
     let slice = core::slice::from_raw_parts(ptr as *const u8, MAX_HOST_STRING_LEN);
-    let len = slice.iter().position(|&b| b == 0).unwrap_or(MAX_HOST_STRING_LEN);
+    let len = slice
+        .iter()
+        .position(|&b| b == 0)
+        .unwrap_or(MAX_HOST_STRING_LEN);
     String::from_utf8_lossy(&slice[..len]).to_string()
 }
 
@@ -138,7 +141,11 @@ fn set_output_str(text: &str) {
 fn kv_get_str(key: &str) -> Option<String> {
     unsafe {
         let ptr = host_kv_get(key.as_ptr(), key.len() as u32);
-        if ptr == 0 { None } else { Some(read_host_string(ptr)) }
+        if ptr == 0 {
+            None
+        } else {
+            Some(read_host_string(ptr))
+        }
     }
 }
 
@@ -146,24 +153,19 @@ fn kv_get_str(key: &str) -> Option<String> {
 fn kv_set_str(key: &str, value: &str) {
     unsafe {
         host_kv_set(
-            key.as_ptr(), key.len() as u32,
-            value.as_ptr(), value.len() as u32,
+            key.as_ptr(),
+            key.len() as u32,
+            value.as_ptr(),
+            value.len() as u32,
         )
     }
 }
-
-// ── Test stubs ──────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-fn log_msg(_level: u32, _msg: &str) {}
 
 // ── Job storage helpers ─────────────────────────────────────────────────────
 
 fn load_jobs(stored: Option<String>) -> Vec<Job> {
     match stored {
-        Some(data) if !data.is_empty() => {
-            serde_json::from_str(&data).unwrap_or_default()
-        }
+        Some(data) if !data.is_empty() => serde_json::from_str(&data).unwrap_or_default(),
         _ => Vec::new(),
     }
 }
@@ -173,9 +175,8 @@ fn serialize_jobs(jobs: &[Job]) -> Result<String, String> {
 }
 
 fn serialize_output<T: Serialize>(value: &T) -> String {
-    serde_json::to_string(value).unwrap_or_else(|e| {
-        format!(r#"{{"error":"serialization failed: {}"}}"#, e)
-    })
+    serde_json::to_string(value)
+        .unwrap_or_else(|e| format!(r#"{{"error":"serialization failed: {}"}}"#, e))
 }
 
 // ── Action handlers ─────────────────────────────────────────────────────────
@@ -183,15 +184,19 @@ fn serialize_output<T: Serialize>(value: &T) -> String {
 fn handle_add(input: &Input, jobs: &mut Vec<Job>) -> String {
     let name = match &input.name {
         Some(n) => n.clone(),
-        None => return serialize_output(&ErrorResponse {
-            error: "missing 'name' field".to_string(),
-        }),
+        None => {
+            return serialize_output(&ErrorResponse {
+                error: "missing 'name' field".to_string(),
+            })
+        }
     };
     let schedule = match &input.schedule {
         Some(s) => s.clone(),
-        None => return serialize_output(&ErrorResponse {
-            error: "missing 'schedule' field".to_string(),
-        }),
+        None => {
+            return serialize_output(&ErrorResponse {
+                error: "missing 'schedule' field".to_string(),
+            })
+        }
     };
     let message = input.message.clone().unwrap_or_default();
     let tz_offset = input.tz_offset_hours.unwrap_or(0);
@@ -226,9 +231,11 @@ fn handle_add(input: &Input, jobs: &mut Vec<Job>) -> String {
 fn handle_remove(input: &Input, jobs: &mut Vec<Job>) -> String {
     let name = match &input.name {
         Some(n) => n.clone(),
-        None => return serialize_output(&ErrorResponse {
-            error: "missing 'name' field".to_string(),
-        }),
+        None => {
+            return serialize_output(&ErrorResponse {
+                error: "missing 'name' field".to_string(),
+            })
+        }
     };
 
     let before = jobs.len();
@@ -247,11 +254,14 @@ fn handle_remove(input: &Input, jobs: &mut Vec<Job>) -> String {
 }
 
 fn handle_list(jobs: &[Job]) -> String {
-    let entries: Vec<ListJobEntry> = jobs.iter().map(|j| ListJobEntry {
-        name: j.name.clone(),
-        schedule: j.cron_expr.clone(),
-        message: j.message.clone(),
-    }).collect();
+    let entries: Vec<ListJobEntry> = jobs
+        .iter()
+        .map(|j| ListJobEntry {
+            name: j.name.clone(),
+            schedule: j.cron_expr.clone(),
+            message: j.message.clone(),
+        })
+        .collect();
 
     serialize_output(&ListResponse { jobs: entries })
 }
@@ -301,12 +311,14 @@ fn days_to_date(days: i64) -> (i32, u32, u32) {
     (y as i32, m, d)
 }
 
-fn handle_check(input: &Input, jobs: &mut Vec<Job>) -> String {
+fn handle_check(input: &Input, jobs: &mut [Job]) -> String {
     let now_unix = match input.now_unix {
         Some(t) => t,
-        None => return serialize_output(&ErrorResponse {
-            error: "missing 'now_unix' field".to_string(),
-        }),
+        None => {
+            return serialize_output(&ErrorResponse {
+                error: "missing 'now_unix' field".to_string(),
+            })
+        }
     };
 
     // Floor to the start of the current minute
@@ -328,8 +340,7 @@ fn handle_check(input: &Input, jobs: &mut Vec<Job>) -> String {
             Err(_) => continue, // skip invalid jobs silently
         };
 
-        let (minute, hour, day, month, weekday) =
-            unix_to_components(now_unix, job.tz_offset_hours);
+        let (minute, hour, day, month, weekday) = unix_to_components(now_unix, job.tz_offset_hours);
 
         if expr.matches(minute, hour, day, month, weekday) {
             due.push(DueJobEntry {
@@ -359,10 +370,7 @@ fn process_input(input_str: &str, stored_jobs: Option<String>) -> (String, Optio
     let mut jobs = load_jobs(stored_jobs);
 
     let output = match input.action.as_str() {
-        "add" => {
-            let result = handle_add(&input, &mut jobs);
-            result
-        }
+        "add" => handle_add(&input, &mut jobs),
         "remove" => handle_remove(&input, &mut jobs),
         "list" => handle_list(&jobs),
         "check" => handle_check(&input, &mut jobs),
@@ -373,12 +381,7 @@ fn process_input(input_str: &str, stored_jobs: Option<String>) -> (String, Optio
 
     // For mutating actions, serialize jobs back
     let save = match input.action.as_str() {
-        "add" | "remove" | "check" => {
-            match serialize_jobs(&jobs) {
-                Ok(s) => Some(s),
-                Err(_) => None,
-            }
-        }
+        "add" | "remove" | "check" => serialize_jobs(&jobs).ok(),
         _ => None,
     };
 
@@ -428,6 +431,16 @@ mod tests {
         assert_eq!(jobs.len(), 1);
         assert_eq!(jobs[0].name, "standup");
         assert_eq!(jobs[0].tz_offset_hours, -7);
+    }
+
+    #[test]
+    fn test_add_records_created_unix() {
+        let input =
+            r#"{"action":"add","name":"standup","schedule":"0 9 * * *","now_unix":1709888400}"#;
+        let (_, save) = process_input(input, None);
+
+        let jobs: Vec<Job> = serde_json::from_str(&save.unwrap()).unwrap();
+        assert_eq!(jobs[0].created_unix, 1709888400);
     }
 
     #[test]
@@ -546,7 +559,9 @@ mod tests {
         let (output1, save) = process_input(check1, save);
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(&output1).unwrap()["due"]
-                .as_array().unwrap().len(),
+                .as_array()
+                .unwrap()
+                .len(),
             1
         );
 
@@ -555,7 +570,9 @@ mod tests {
         let (output2, _) = process_input(check2, save);
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(&output2).unwrap()["due"]
-                .as_array().unwrap().len(),
+                .as_array()
+                .unwrap()
+                .len(),
             0
         );
     }

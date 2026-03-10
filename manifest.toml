@@ -5,3 +5,43 @@ author = "Fawx Team"
 api_version = "host_api_v1"
 capabilities = ["storage"]
 entry_point = "run"
+
+[[tools]]
+name = "scheduler"
+description = "Manage cron-based scheduled jobs: add, remove, list, or check for due jobs"
+
+[[tools.parameters]]
+name = "action"
+type = "string"
+description = "Action to perform: 'add', 'remove', 'list', or 'check'"
+required = true
+
+[[tools.parameters]]
+name = "name"
+type = "string"
+description = "Job name (required for add/remove)"
+required = false
+
+[[tools.parameters]]
+name = "schedule"
+type = "string"
+description = "5-field cron expression, e.g., '0 9 * * *' (required for add)"
+required = false
+
+[[tools.parameters]]
+name = "message"
+type = "string"
+description = "Message to deliver when the job fires (for add)"
+required = false
+
+[[tools.parameters]]
+name = "tz_offset_hours"
+type = "string"
+description = "Timezone offset from UTC in hours, e.g., '-7' for Mountain Time (for add, default: 0)"
+required = false
+
+[[tools.parameters]]
+name = "now_unix"
+type = "string"
+description = "Current unix timestamp in seconds (required for check, used for add to set created_unix)"
+required = false

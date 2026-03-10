@@ -1,16 +1,16 @@
-/// Minimal 5-field cron expression parser.
-///
-/// Fields: minute hour day-of-month month day-of-week
-/// Supports: `*`, `*/N`, `N`, `N,M`, `N-M`, and combinations thereof.
+//! Minimal 5-field cron expression parser.
+//!
+//! Fields: minute hour day-of-month month day-of-week
+//! Supports: `*`, `*/N`, `N`, `N,M`, `N-M`, and combinations thereof.
 
 /// A parsed cron expression with pre-computed match sets for each field.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CronExpr {
-    pub minutes: Vec<u8>,   // 0-59
-    pub hours: Vec<u8>,     // 0-23
-    pub days: Vec<u8>,      // 1-31
-    pub months: Vec<u8>,    // 1-12
-    pub weekdays: Vec<u8>,  // 0-6 (0 = Sunday)
+    pub minutes: Vec<u8>,  // 0-59
+    pub hours: Vec<u8>,    // 0-23
+    pub days: Vec<u8>,     // 1-31
+    pub months: Vec<u8>,   // 1-12
+    pub weekdays: Vec<u8>, // 0-6 (0 = Sunday)
 }
 
 /// Parse error for cron expressions.
@@ -102,7 +102,10 @@ fn parse_field(field: &str, min: u8, max: u8) -> Result<Vec<u8>, CronParseError>
             let end = parse_number(end_str, field)?;
             if start < min || end > max || start > end {
                 return Err(CronParseError {
-                    message: format!("range {}-{} out of bounds ({}-{}) in '{}'", start, end, min, max, field),
+                    message: format!(
+                        "range {}-{} out of bounds ({}-{}) in '{}'",
+                        start, end, min, max, field
+                    ),
                 });
             }
             for v in start..=end {
